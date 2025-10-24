@@ -91,3 +91,29 @@ def activate_license(request: ActivationRequest, db: Session = Depends(get_db)):
 @app.get("/")
 def read_root():
     return {"message": "授权服务器正在运行"}
+
+# --- 新增的调试接口，请粘贴到文件末尾 ---
+@app.get("/debug-db")
+def debug_db_connection():
+    """
+    一个专门用于测试数据库连接的接口。
+    """
+    # 打印出Vercel真实读取到的环境变量
+    db_url_from_env = os.environ.get("DATABASE_URL")
+    if not db_url_from_env:
+        return {"error": "DATABASE_URL environment variable is NOT SET in Vercel."}
+
+    # 尝试连接并返回结果
+    try:
+        print("Debug: Attempting to create engine...")
+        # 创建一个新的临时引擎来测试连接
+        temp_engine = create_engine(db_url_from_env)
+        print("Debug: Engine created. Attempting to connect...")
+        connection = temp_engine.connect()
+        print("Debug: Connection successful.")
+        connection.close()
+        return {"status": "SUCCESS", "message": "Successfully connected to the database!"}
+    except Exception as e:
+        # 将底层的、最真实的错误信息返回
+        print(f"Debug: Connection FAILED. Error: {e}")
+        return {"status": "FAILED", "error": str(e)}
