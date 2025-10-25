@@ -1,4 +1,4 @@
-# 文件名: main.py
+# 文件名: main.py (已添加 CORS 修复)
 
 import os
 import jwt
@@ -8,6 +8,9 @@ from fastapi import FastAPI, HTTPException, Depends
 from pydantic import BaseModel 
 from sqlalchemy import create_engine, Column, Integer, String, Boolean, DateTime, ForeignKey
 from sqlalchemy.orm import sessionmaker, Session, declarative_base
+
+# --- 1. 新增：从 fastapi 导入 CORSMiddleware ---
+from fastapi.middleware.cors import CORSMiddleware
 
 # --- 配置 ---
 DATABASE_URL = os.environ.get("DATABASE_URL")
@@ -43,6 +46,22 @@ class ActivationRequest(BaseModel):
 
 # --- FastAPI 应用 ---
 app = FastAPI()
+
+# --- 2. 新增：在这里添加 CORS 中间件 ---
+# !! 确保这个网址是您网页版的真实网址 !!
+origins = [
+    "https://kerrey-web-client.vercel.app"
+]
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=origins,       # 允许来自您网页版的请求
+    allow_credentials=True,    # 允许 cookies (如果未来需要)
+    allow_methods=["GET", "POST", "OPTIONS"], # 允许的方法
+    allow_headers=["*"],         # 允许所有请求头
+)
+# --- CORS 配置结束 ---
+
 
 @app.on_event("startup")
 def startup_event():
@@ -92,21 +111,17 @@ def activate_license(request: ActivationRequest, db: Session = Depends(get_db)):
 def read_root():
     return {"message": "授权服务器正在运行"}
 
-# --- 新增的调试接口，请粘贴到文件末尾 ---
+# --- 新增的调试接口 ---
 @app.get("/debug-db")
 def debug_db_connection():
     """
     一个专门用于测试数据库连接的接口。
     """
-    # 打印出Vercel真实读取到的环境变量
     db_url_from_env = os.environ.get("DATABASE_URL")
     if not db_url_from_env:
         return {"error": "DATABASE_URL environment variable is NOT SET in Vercel."}
-
-    # 尝试连接并返回结果
     try:
         print("Debug: Attempting to create engine...")
-        # 创建一个新的临时引擎来测试连接
         temp_engine = create_engine(db_url_from_env)
         print("Debug: Engine created. Attempting to connect...")
         connection = temp_engine.connect()
@@ -114,6 +129,5 @@ def debug_db_connection():
         connection.close()
         return {"status": "SUCCESS", "message": "Successfully connected to the database!"}
     except Exception as e:
-        # 将底层的、最真实的错误信息返回
         print(f"Debug: Connection FAILED. Error: {e}")
         return {"status": "FAILED", "error": str(e)}
